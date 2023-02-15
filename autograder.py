@@ -14,6 +14,17 @@ Evaluation = collections.namedtuple("Evaluation", ["case", "time", "answer", "is
 StudentDeliverable = collections.namedtuple("StudentDeliverable", ["name", "identifier", "code_file"])
 EvaluatedStudent = collections.namedtuple("EvaluatedStudent", ["student", "evaluation"])
 
+class colour:
+   PURPLE = '\033[95m'
+   CYAN = '\033[96m'
+   DARKCYAN = '\033[36m'
+   BLUE = '\033[94m'
+   GREEN = '\033[92m'
+   YELLOW = '\033[93m'
+   RED = '\033[91m'
+   BOLD = '\033[1m'
+   UNDERLINE = '\033[4m'
+   END = '\033[0m'
 
 def find_all_case_files(working_dir):
     case_files = []
@@ -60,23 +71,57 @@ def find_all_student_codes(deliverables_dir, metadata_csv_file, name_key="Nome C
             except KeyError:
                 print(f"Student {name}, id {identifier}, did not deliver homework")
                 student = StudentDeliverable(name=name, identifier=identifier, code_file=None)
-            
+
             students.append(student)
 
     students = sorted(students, key=lambda x: x.name)
     return students
 
+
 def grade_multiple_students(students, grader):
     evaluated_students = []
     for student in students:
         if student.code_file is not None:
-            print(f"Grading student {student.name}, id {student.identifier}")
+            print(f"{colour.BOLD}Grading student {student.name}, id {student.identifier}{colour.END}")
             student_eval = grader.test_code_in_working_dir(student.code_file)
         else:
             student_eval = None
         evaluated_student = EvaluatedStudent(student=student, evaluation=student_eval)
         evaluated_students.append(evaluated_student)
     return evaluated_students
+
+
+def generate_csv_from_evaluated_students(evaluated_students, grader, csv_path):
+
+    header = ['Nome', 'ID'] + [str(case.case_id) for case in grader.case_files]
+    header += ['Total', 'Time'] + [f"Answer {case.case_id}" for case in grader.case_files]
+    header += [f"Error {case.case_id}" for case in grader.case_files]
+
+    with open(csv_path, mode='w') as new_csv_file:
+        csv_writter = csv.DictWriter(new_csv_file, header)
+        csv_writter.writeheader()
+
+        for evaluated_student in evaluated_students:
+            new_row = {"Nome": evaluated_student.student.name, "ID": evaluated_student.student.identifier}
+            total_time = 0.
+            total_correct = 0.
+            if evaluated_student.evaluation is not None:
+                for e in evaluated_student.evaluation:
+                    new_row[str(e.case.case_id)] = float(e.is_correct)
+                    new_row[f"Answer {e.case.case_id}"] = e.answer
+                    new_row[f"Error {e.case.case_id}"] = e.errors
+                    total_time += e.time
+                    total_correct += float(e.is_correct)
+                new_row["Total"] = total_correct / float(len(evaluated_student.evaluation))
+                new_row["Time"] = f"{total_time:0.2f}"
+            else:
+                new_row["Total"] = 0.0
+            csv_writter.writerow(new_row)
+
+def print_out_execution_errors(evaluations):
+    for evaluation in evaluations:
+        print(f"{colour.RED}Showing errors or warnings for Case {evaluation.case.case_id}{colour.END}")
+        print(evaluation.errors)
 
 class CodeAutoGrader(object):
 
@@ -97,7 +142,13 @@ class CodeAutoGrader(object):
         complete_eval = []
         for case in self.case_files:
 
+            if verbose:
+                print(f"{colour.CYAN}Running Case {case.case_id} {colour.END}")
             time_to_run, answer, errors = self.run_case(case)
+            if verbose:
+                print(f"Took {time_to_run:0.2f}s to run")
+                if errors:
+                    print(f"There were errors/warnings when running!")
             is_correct = self.check_case(case, answer, verbose=verbose)
 
             evaluation = Evaluation(case=case, time=time_to_run, answer=answer,
@@ -113,7 +164,7 @@ class CodeAutoGrader(object):
                                     input=case.in_content.encode(), capture_output=True, timeout=self.timeout, cwd=self.working_dir)
         except subprocess.TimeoutExpired as e:
             totaltime = (time.perf_counter() - rightnow)
-            return totaltime, None, "Timeout"
+            return totaltime, f"Timed out at {totaltime:0.2f}s", "Timeout"
         totaltime = (time.perf_counter() - rightnow)
 
         answer = result.stdout.decode('utf-8').rstrip()
@@ -123,9 +174,12 @@ class CodeAutoGrader(object):
 
     def check_case(self, case, answer, verbose=True):
         is_correct = answer == case.out_content
+        if verbose:
+            print(f"\tExpected answer: {case.out_content}")
+            print(f"\tComputed Answer: {answer}")
         if is_correct and verbose:
-            print(f"Case {case.case_id}: {answer}, Right")
+            print(f"\t{colour.GREEN}It is Correct!{colour.END}")
         elif verbose:
-            print(f"Case {case.case_id}: {answer}, Wrong")
+            print(f"\t{colour.RED}Wrong, sorry{colour.END}")
 
         return is_correct
