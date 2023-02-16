@@ -15,10 +15,12 @@ def main():
                         help="CSV file with names and user IDs")
     parser.add_argument('-t', '--timeout', type=int,
                         help="Timeout in seconds")
+    parser.add_argument('-f', '--float-tolerance', type=float, default=0.0,
+                        help="If the answer is a single floating value, include a tolerance")
 
     args = parser.parse_args()
 
-    grader = autograder.CodeAutoGrader(args.working_dir, timeout=args.timeout)
+    grader = autograder.CodeAutoGrader(args.working_dir, timeout=args.timeout, float_tolerance=args.float_tolerance)
 
     students = autograder.find_all_student_codes(
         deliverables_dir=args.code_delivery_dir,

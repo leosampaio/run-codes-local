@@ -125,11 +125,18 @@ def print_out_execution_errors(evaluations):
 
 class CodeAutoGrader(object):
 
-    def __init__(self, working_dir, use_cases_as_file=True, timeout=10):
+    def __init__(self, working_dir, use_cases_as_file=True, timeout=10, float_tolerance=0.0):
         self.working_dir = working_dir
         self.case_files = find_all_case_files(working_dir)
         self.use_cases_as_file = use_cases_as_file
         self.timeout = timeout
+
+        print(float_tolerance)
+        if float_tolerance > 0.0:
+            self.answer_is_float = True
+            self.float_tolerance = float_tolerance
+        else:
+            self.answer_is_float = False
 
     def test_code_in_working_dir(self, code_file, verbose=True):
 
@@ -173,7 +180,10 @@ class CodeAutoGrader(object):
         return totaltime, answer, errors
 
     def check_case(self, case, answer, verbose=True):
-        is_correct = answer == case.out_content
+        if self.answer_is_float:
+            is_correct = self.check_case_float(case, answer)
+        else:
+            is_correct = answer == case.out_content
         if verbose:
             print(f"\tExpected answer: {case.out_content}")
             print(f"\tComputed Answer: {answer}")
@@ -183,3 +193,9 @@ class CodeAutoGrader(object):
             print(f"\t{colour.RED}Wrong, sorry{colour.END}")
 
         return is_correct
+
+    def check_case_float(self, case, answer):
+        try:
+            return abs(float(case.out_content) - float(answer)) <= self.float_tolerance
+        except ValueError:
+            return False

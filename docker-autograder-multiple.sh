@@ -11,6 +11,7 @@ help () {
    echo "   -t <timeout>"
    echo "   -e <show errors>"
    echo "   -i <docker-image>"
+   echo "   -f <float-tolerance>"
 }
 
 # parser = argparse.ArgumentParser(
@@ -29,6 +30,7 @@ help () {
 DOCKER_IMAGE=aleosampaio/image-processing:2023
 show_errors=''
 timeout=10
+float_tolerance=0
 
 # check for correct usage
 if test $# -lt 2
@@ -64,6 +66,9 @@ while getopts "h?d:c:t:i:o:m:e" opt; do
     m)  
         meta_csv=$OPTARG
         ;;
+    f)  
+        float_tolerance=$OPTARG
+        ;;
     e)  
         show_errors='-e'
         ;;
@@ -84,7 +89,7 @@ shift $((OPTIND-1))
 
 # create the docker container
 echo "Creating container..."
-docker create --name autograder -it ${DOCKER_IMAGE} python /src/grade-multiple.py -d /assignment -c /deliverables -t ${timeout} -o out.csv -m /assignment/meta.csv ${show_errors} 
+docker create --name autograder -it ${DOCKER_IMAGE} python /src/grade-multiple.py -d /assignment -c /deliverables -t ${timeout} -f ${float_tolerance} -o out.csv -m /assignment/meta.csv ${show_errors} 
 
 echo "Copying files..."
 docker cp ${code_files}/. autograder:/deliverables/

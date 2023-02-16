@@ -13,10 +13,12 @@ def main():
                         help="Timeout in seconds")
     parser.add_argument('-e', "--show-errors", action='store_true',
                         help="Show errors/warnings for each test case")
+    parser.add_argument('-f', '--float-tolerance', type=float, default=0.0,
+                        help="If the answer is a single floating value, include a tolerance")
 
     args = parser.parse_args()
 
-    grader = autograder.CodeAutoGrader(args.working_dir, timeout=args.timeout)
+    grader = autograder.CodeAutoGrader(args.working_dir, timeout=args.timeout, float_tolerance=args.float_tolerance)
     evaluations = grader.test_code_in_working_dir(args.code)
 
     if args.show_errors:
