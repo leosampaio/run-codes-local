@@ -131,7 +131,6 @@ class CodeAutoGrader(object):
         self.use_cases_as_file = use_cases_as_file
         self.timeout = timeout
 
-        print(float_tolerance)
         if float_tolerance > 0.0:
             self.answer_is_float = True
             self.float_tolerance = float_tolerance
