@@ -73,7 +73,7 @@ docker create --name autograder --rm -it ${DOCKER_IMAGE} python /src/grade-singl
 
 echo "Copying files..."
 docker cp "${code_file}" autograder:/deliverables/test.py
-docker cp ${working_dir}/. autograder:/assignment/
+docker cp "${working_dir}/." autograder:/assignment/
 
 echo "Autograder Started!"
 docker start -a -i autograder
