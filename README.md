@@ -8,19 +8,13 @@
 To run locally on your machine:
 
 ```
-grade-single.py [-h] [-d WORKING_DIR] [-c CODE] [-t TIMEOUT] [-e]
+python grade-single.py [-h] [-d WORKING_DIR] [-c CODE] [-t TIMEOUT] [-e] [--use-makefile]
 ```
-where `-d` sets the assignment directory, with case inputs and outpus plus other necessary files. `-c` sets your own python code. `-e` shows errors for each test case at the end. 
-
-To run locally on you machine, but under the common docker container:
-
-```
-docker-autograder-single.sh [-h] [-d WORKING_DIR] [-c CODE] [-t TIMEOUT] [-e]
-```
-where the parameters are the same but you need to have docker installed. This is the preferred method to test since it yields the same results the Teaching Assistants will get when they run on their machines.
+where `-d` sets the assignment directory, with case inputs and outpus plus other necessary files if they exist. `-c` sets the path to your code (either a `.py`, `.cpp` or a directory with a `MAKEFILE` inside. If using a `MAKEFILE`, be sure to include `--use-makefile`. Finally, the `-e` option shows errors for each test case at the end. 
 
 -----------
-### Multiple Homeworks Usage (for Teaching Assistants grading multiple students)
+
+<!-- ### Multiple Homeworks Usage (for Teaching Assistants grading multiple students)
 
 To run locally on your machine:
 
@@ -33,4 +27,4 @@ To run locally, but inder a common docker container (much prefeered for consiste
 
 ```
 docker-autograder-multiple.sh [-h] [-d WORKING_DIR] [-c CODE_DELIVERY_DIR] [-o OUTPUT_CSV] [-m METADATA_CSV] [-t TIMEOUT]
-```
+``` -->
