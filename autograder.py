@@ -38,8 +38,11 @@ def find_all_case_files(working_dir):
                 in_content = ''.join(in_content)
             with open(output_file, mode='r') as correcttest:
                 out_content = correcttest.readlines()
-                out_content[-1] = out_content[-1].rstrip()
-                out_content = ''.join(out_content)
+                try:
+                    out_content[-1] = out_content[-1].rstrip()
+                    out_content = ''.join(out_content)
+                except IndexError:
+                    out_content = ""
             case_file = CaseFile(case_id=case_id, in_file=input_file, out_file=output_file,
                                  in_content=in_content, out_content=out_content)
             case_files.append(case_file)
@@ -125,11 +128,12 @@ def print_out_execution_errors(evaluations):
 
 class CodeAutoGrader(object):
 
-    def __init__(self, working_dir, use_cases_as_file=True, timeout=10, float_tolerance=0.0):
+    def __init__(self, working_dir, use_cases_as_file=True, timeout=10, float_tolerance=0.0, use_makefile=False):
         self.working_dir = working_dir
         self.case_files = find_all_case_files(working_dir)
         self.use_cases_as_file = use_cases_as_file
         self.timeout = timeout
+        self.use_makefile = use_makefile
 
         if float_tolerance > 0.0:
             self.answer_is_float = True
@@ -139,22 +143,16 @@ class CodeAutoGrader(object):
 
     def test_code_in_working_dir(self, code_file, verbose=True):
 
-        if code_file[-3:] != ".py":
-            raise ValueError(f"Code file {code_file} not currently supported by run-codes-local")
-
-        # copy code to working directory
-        shutil.copyfile(code_file, os.path.join(self.working_dir, "./autograder_test.py"))
-
         complete_eval = []
         for case in self.case_files:
 
             if verbose:
                 print(f"{colour.CYAN}Running Case {case.case_id} {colour.END}")
-            time_to_run, answer, errors = self.run_case(case)
+            time_to_run, answer, errors = self.run_case(code_file, case)
             if verbose:
-                print(f"Took {time_to_run:0.2f}s to run")
+                print(f"Took {time_to_run: 0.2f}s to run")
                 if errors:
-                    print(f"There were errors/warnings when running!")
+                    print(f"{colour.RED}There were errors/warnings when running!{colour.END}")
             is_correct = self.check_case(case, answer, verbose=verbose)
 
             evaluation = Evaluation(case=case, time=time_to_run, answer=answer,
@@ -163,18 +161,59 @@ class CodeAutoGrader(object):
 
         return complete_eval
 
-    def run_case(self, case):
+
+    def run_case(self, code_file, case):
+
         rightnow = time.perf_counter()
+
         try:
-            result = subprocess.run(["python", "./autograder_test.py"],
-                                    input=case.in_content.encode(), capture_output=True, timeout=self.timeout, cwd=self.working_dir)
+            if self.use_makefile:
+                try:
+                    compilation_res = subprocess.run(["make", "all"],
+                          capture_output=True, timeout=self.timeout, cwd=code_file)
+                    compilation_res = compilation_res.stderr.decode('utf-8').rstrip()
+                except Exception as e:
+                    compilation_res = str(e)
+                    return 0, f"Compilation error: {compilation_res}", f"Compilation error: {compilation_res}"
+                try:
+                    result = subprocess.run(["make", "run"],
+                          input=case.in_content.encode(), capture_output=True, timeout=self.timeout, cwd=self.working_dir)
+                except Exception as e:
+                    result = str(e)
+                    return 0, f"{compilation_res}\n{result}", f"{compilation_res}\n{result}"
+
+            if code_file[-3:] == ".py":
+                # interpreted, copy code to working directory
+                shutil.copyfile(code_file, os.path.join(self.working_dir, "./autograder_test.py"))
+                compilation_res = ""
+                result = subprocess.run(["python", "./autograder_test.py"],
+                          input=case.in_content.encode(), capture_output=True, timeout=self.timeout, cwd=self.working_dir)
+
+            # breakpoint()
+            if code_file[-4:] == ".cpp":
+                # g++ ${src_file} -o ${user_bin} -w -O2 -lm
+                try:
+                    shutil.copyfile(code_file, os.path.join(self.working_dir, "./autograder_test.cpp"))
+                    compilation_res = subprocess.run(["g++", "./autograder_test.cpp", "-o", "autograder_test", "-w", "-O2", "-lm"],
+                          capture_output=True, timeout=self.timeout, cwd=self.working_dir)
+                    compilation_res = compilation_res.stderr.decode('utf-8').rstrip()
+                except Exception as e:
+                    compilation_res = str(e)
+                    return 0, f"Compilation error: {compilation_res}", f"Compilation error: {compilation_res}"
+                try:
+                    result = subprocess.run(["./autograder_test"],
+                          input=case.in_content.encode(), capture_output=True, timeout=self.timeout, cwd=self.working_dir)
+                except Exception as e:
+                    result = str(e)
+                    return 0, f"{compilation_res}\n{result}", f"{compilation_res}\n{result}"
+
         except subprocess.TimeoutExpired as e:
             totaltime = (time.perf_counter() - rightnow)
             return totaltime, f"Timed out at {totaltime:0.2f}s", "Timeout"
-        totaltime = (time.perf_counter() - rightnow)
 
+        totaltime = (time.perf_counter() - rightnow)
         answer = result.stdout.decode('utf-8').rstrip()
-        errors = result.stderr.decode('utf-8').rstrip()
+        errors = compilation_res + result.stderr.decode('utf-8').rstrip()
 
         return totaltime, answer, errors
 
@@ -184,8 +223,8 @@ class CodeAutoGrader(object):
         else:
             is_correct = answer == case.out_content
         if verbose:
-            print(f"\tExpected answer: {case.out_content}")
-            print(f"\tComputed Answer: {answer}")
+            print(f"\tExpected answer: \n{case.out_content}")
+            print(f"\tComputed Answer: \n{answer}")
         if is_correct and verbose:
             print(f"\t{colour.GREEN}It is Correct!{colour.END}")
         elif verbose:
